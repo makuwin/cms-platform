@@ -1,0 +1,24 @@
+---
+import DashboardLayout from '@layouts/DashboardLayout.astro';
+import Dashboard from '@components/react/Dashboard.tsx';
+import Editor from '@components/react/Editor.tsx';
+import LiveChat from '@components/islands/LiveChat.tsx';
+import DynamicIsland from '@components/react/DynamicIsland.tsx';
+---
+
+<DashboardLayout title="Team Dashboard">
+  <section class="grid gap-6 lg:grid-cols-[2fr,1fr]">
+    <div class="space-y-6">
+      <Dashboard client:load />
+      <Editor client:idle />
+    </div>
+    <div class="space-y-6">
+      <LiveChat client:visible />
+      <DynamicIsland
+        client:visible
+        apiEndpoint="https://status.github.com/api/status.json"
+        pollInterval={20000}
+      />
+    </div>
+  </section>
+</DashboardLayout>

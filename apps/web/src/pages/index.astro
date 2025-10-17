@@ -1,0 +1,87 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import ArticleCard from '@components/astro/ArticleCard.astro';
+import Counter from '@components/react/Counter.tsx';
+import ExpensiveComponent from '@components/react/ExpensiveComponent.tsx';
+import LazyImage from '@components/react/LazyImage.tsx';
+import StaticComponent from '@components/react/StaticComponent.tsx';
+import DynamicIsland from '@components/react/DynamicIsland.tsx';
+import { Image } from 'astro:assets';
+import heroImage from '../assets/hero.jpg';
+import { getArticles } from '@lib/api';
+
+export const prerender = true;
+export const revalidate = 60;
+
+const articles = await getArticles();
+---
+
+<BaseLayout title="CMS Platform">
+  <section class="grid gap-8 lg:grid-cols-[3fr,2fr]">
+    <div class="space-y-6">
+      <h1 class="text-4xl font-bold tracking-tight text-neutral-50">
+        Build, publish, and optimize your content workflows.
+      </h1>
+      <p class="max-w-xl text-lg text-neutral-300">
+        A modern CMS platform that combines real-time collaboration, rich content
+        authoring, and blazing-fast delivery powered by Astro and Next.js APIs.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <a
+          class="rounded-lg border border-primary-500/40 bg-primary-500/20 px-5 py-2.5 text-sm font-semibold text-primary-100 hover:bg-primary-500/30"
+          href="/dashboard"
+        >
+          Go to dashboard
+        </a>
+        <a
+          class="rounded-lg border border-white/10 px-5 py-2.5 text-sm font-semibold text-neutral-200 hover:border-primary-500/40 hover:text-primary-200"
+          href="/blog"
+        >
+          Explore articles
+        </a>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-3xl border border-white/10">
+      <Image
+        src={heroImage}
+        alt="Editorial team collaborating on the CMS platform"
+        width={1200}
+        height={600}
+        format="webp"
+        loading="lazy"
+        class="h-full w-full object-cover"
+      />
+    </div>
+  </section>
+
+  <section class="space-y-6">
+    <header class="flex items-center justify-between">
+      <h2 class="text-2xl font-semibold text-neutral-100">Latest stories</h2>
+      <a class="text-sm text-primary-300 hover:text-primary-200" href="/blog">
+        View all
+      </a>
+    </header>
+    <div class="grid gap-6 md:grid-cols-2">
+      {articles.slice(0, 4).map((article) => (
+        <ArticleCard article={article} />
+      ))}
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-2xl font-semibold text-neutral-100">
+      Partial hydration strategies
+    </h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <Counter client:load />
+      <ExpensiveComponent client:idle />
+      <LazyImage client:visible src={heroImage.src} alt="Preview" />
+      <StaticComponent />
+      <DynamicIsland
+        client:visible
+        apiEndpoint="https://status.github.com/api/status.json"
+        pollInterval={15000}
+      />
+    </div>
+  </section>
+</BaseLayout>

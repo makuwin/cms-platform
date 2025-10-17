@@ -1,0 +1,29 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import ArticleCard from '@components/astro/ArticleCard.astro';
+import { getArticles } from '@lib/api';
+
+export const prerender = true;
+export const revalidate = 120;
+
+const articles = await getArticles();
+---
+
+<BaseLayout
+  title="Blog · CMS Platform"
+  description="Insights, tutorials, and updates from the CMS platform team."
+>
+  <section class="space-y-8">
+    <header class="space-y-2">
+      <h1 class="text-3xl font-semibold text-neutral-50">Blog</h1>
+      <p class="max-w-2xl text-sm text-neutral-400">
+        Deep dives into content strategy, platform updates, and best practices for building delightful editorial experiences.
+      </p>
+    </header>
+    <div class="grid gap-6 md:grid-cols-2">
+      {articles.map((article) => (
+        <ArticleCard article={article} />
+      ))}
+    </div>
+  </section>
+</BaseLayout>
