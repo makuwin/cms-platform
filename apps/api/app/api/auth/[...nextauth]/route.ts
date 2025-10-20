@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server';
 
 const message =
   'NextAuth handler is not configured. Add your NextAuth configuration here.';
@@ -13,6 +12,6 @@ export async function GET() {
   );
 }
 
-export async function POST(request: NextRequest) {
-  return GET(request);
+export async function POST() {
+  return GET();
 }

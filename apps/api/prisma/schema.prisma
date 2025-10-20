@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  name         String?
+  passwordHash String?
+  role         String           @default("viewer")
+  permissions  String[]         @default([])
+
+  contentsCreated Content[]        @relation("ContentCreatedBy")
+  contentsUpdated Content[]        @relation("ContentUpdatedBy")
+  versionsCreated ContentVersion[] @relation("VersionCreatedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Content {
+  id                String           @id @default(cuid())
+  title             String
+  slug              String           @unique
+  type              String
+  status            String           @default("draft")
+  description       String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  publishedAt       DateTime?
+
+  createdById       String?
+  updatedById       String?
+  publishedVersionId String? @unique
+
+  createdBy         User?            @relation("ContentCreatedBy", fields: [createdById], references: [id])
+  updatedBy         User?            @relation("ContentUpdatedBy", fields: [updatedById], references: [id])
+  versions          ContentVersion[] @relation("ContentVersions")
+  publishedVersion  ContentVersion?  @relation("PublishedVersion", fields: [publishedVersionId], references: [id])
+
+  @@index([status])
+  @@index([type])
+  @@index([publishedAt])
+}
+
+model ContentVersion {
+  id          String   @id @default(cuid())
+  version     Int
+  data        Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+
+  contentId   String
+  createdById String?
+
+  content       Content @relation("ContentVersions", fields: [contentId], references: [id])
+  createdBy     User?   @relation("VersionCreatedBy", fields: [createdById], references: [id])
+  publishedFor  Content? @relation("PublishedVersion")
+
+  @@unique([contentId, version])
+  @@index([contentId])
+}

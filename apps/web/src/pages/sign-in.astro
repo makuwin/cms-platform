@@ -1,0 +1,245 @@
+---
+import Header from "../components/astro/Header.astro";
+import Footer from "../components/astro/Footer.astro";
+
+const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:3000";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>Sign In | NovaCMS</title>
+  </head>
+  <body>
+    <Header />
+
+    <main class="sign-in-page">
+      <section class="intro">
+        <h1>Welcome back to NovaCMS</h1>
+        <p>
+          Manage your content universe, collaborate with teammates, and review
+          analytics from a single, unified cockpit.
+        </p>
+      </section>
+
+      <section class="auth-card">
+        <form data-sign-in-form data-api-base={apiBase}>
+          <div class="field">
+            <label for="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              placeholder="you@example.com"
+              required
+            />
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Enter your password"
+              required
+            />
+          </div>
+
+          <button class="submit" type="submit" data-sign-in-submit
+            >Sign In</button
+          >
+          <p
+            class="feedback"
+            data-sign-in-feedback
+            role="status"
+            aria-live="polite"
+          >
+          </p>
+        </form>
+
+        <aside class="tips">
+          <img
+            src="https://picsum.photos/seed/signin/480/320"
+            alt="Abstract monochrome shapes"
+            loading="lazy"
+          />
+          <div>
+            <h2>Need an account?</h2>
+            <p>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
+              luctus sed urna id porta. Vestibulum ante ipsum primis in faucibus
+              orci luctus et ultrices posuere cubilia curae.
+            </p>
+            <a class="secondary-action" href="/sign-up">Request access</a>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <Footer />
+    <script src="/scripts/signInPage.js" defer></script>
+  </body>
+</html>
+
+<style>
+  :global(body) {
+    margin: 0;
+    font-family:
+      "Inter",
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      sans-serif;
+    color: #1f2937;
+    background: #f8fafc;
+  }
+
+  .sign-in-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .intro h1 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(2.1rem, 3vw, 2.8rem);
+  }
+
+  .intro p {
+    margin: 0;
+    color: #4b5563;
+    line-height: 1.7;
+    max-width: 620px;
+  }
+
+  .auth-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2.5rem;
+    align-items: stretch;
+    background: #ffffff;
+    border-radius: 1.25rem;
+    padding: 2.5rem;
+    box-shadow: 0 24px 45px rgba(15, 23, 42, 0.12);
+  }
+
+  form[data-sign-in-form] {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .field label {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .field input {
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5f5;
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .field input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  }
+
+  .submit {
+    border: none;
+    border-radius: 0.9rem;
+    padding: 0.95rem 1rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #f8fafc;
+    cursor: pointer;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 32px rgba(99, 102, 241, 0.3);
+  }
+
+  .submit:disabled {
+    opacity: 0.7;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+  }
+
+  .feedback {
+    min-height: 1.4rem;
+    font-size: 0.95rem;
+  }
+
+  .tips {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .tips img {
+    width: 100%;
+    border-radius: 1rem;
+    object-fit: cover;
+  }
+
+  .tips h2 {
+    margin: 0;
+    font-size: 1.35rem;
+  }
+
+  .tips p {
+    margin: 0.5rem 0 1rem;
+    color: #475569;
+    line-height: 1.6;
+  }
+
+  .secondary-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+    font-weight: 600;
+    color: #4338ca;
+  }
+
+  .secondary-action::after {
+    content: "→";
+    transition: transform 0.2s ease;
+  }
+
+  .secondary-action:hover::after {
+    transform: translateX(4px);
+  }
+
+  @media (max-width: 720px) {
+    .auth-card {
+      padding: 2rem;
+    }
+  }
+</style>

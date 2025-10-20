@@ -1,38 +1,16 @@
 {
   "name": "web",
-  "version": "0.1.0",
-  "private": true,
   "type": "module",
+  "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
-    "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check-types": "astro check",
-    "lint": "eslint . --max-warnings 0"
+    "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/node": "^9.5.0",
-    "@astrojs/react": "^4.4.0",
-    "@astrojs/tailwind": "^5.1.0",
     "@tanstack/react-query": "^5.90.5",
-    "@tiptap/react": "^2.7.4",
-    "@tiptap/starter-kit": "^2.7.4",
-    "astro": "^5.14.5",
-    "axios": "^1.12.2",
-    "recharts": "^2.15.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@astrojs/check": "^0.8.3",
-    "@repo/eslint-config": "*",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^9.34.0",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.16",
-    "typescript": "5.9.2"
+    "astro": "^5.14.6",
+    "axios": "^1.12.2"
   }
 }

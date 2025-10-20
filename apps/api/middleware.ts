@@ -7,10 +7,48 @@ const CACHE_HEADERS = {
   'CDN-Cache-Control': 'max-age=3600',
 };
 
+const ALLOWED_ORIGINS = (
+  process.env.CORS_ALLOWED_ORIGINS ??
+  'http://localhost:4321'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+function resolveOrigin(requestOrigin: string | null) {
+  if (!requestOrigin) return null;
+  if (ALLOWED_ORIGINS.includes('*')) return requestOrigin;
+  return ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : null;
+}
+
+function applyCorsHeaders(response: NextResponse, origin: string | null) {
+  if (!origin) return response;
+  response.headers.set('Access-Control-Allow-Origin', origin);
+  response.headers.set('Vary', 'Origin');
+  response.headers.set(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-API-Key',
+  );
+  response.headers.set(
+    'Access-Control-Allow-Methods',
+    'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  );
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (!pathname.startsWith('/api/')) {
     return NextResponse.next();
+  }
+
+  const requestOrigin = resolveOrigin(request.headers.get('origin'));
+
+  if (request.method === 'OPTIONS') {
+    const preflight = new NextResponse(null, { status: 204 });
+    applyCorsHeaders(preflight, requestOrigin);
+    return preflight;
   }
 
   const authHeader = request.headers.get('authorization');
@@ -34,19 +72,22 @@ export async function middleware(request: NextRequest) {
   const limited = await isRateLimited(rateKey, bucket);
 
   if (limited) {
-    return NextResponse.json(
+    const limitedResponse = NextResponse.json(
       { error: 'Too Many Requests', retryAfter: bucket.windowSeconds },
       {
         status: 429,
         headers: { 'Retry-After': bucket.windowSeconds.toString() },
       },
     );
+    applyCorsHeaders(limitedResponse, requestOrigin);
+    return limitedResponse;
   }
 
   const response = NextResponse.next();
   Object.entries(CACHE_HEADERS).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
+  applyCorsHeaders(response, requestOrigin);
   return response;
 }
 

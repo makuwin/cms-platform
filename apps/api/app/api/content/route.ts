@@ -7,19 +7,26 @@ import { validateContent } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   const user = getAuthUserFromRequest(request);
-  if (!user || !hasPermission(user, 'content:read')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const isAuthorized = Boolean(user && hasPermission(user, 'content:read'));
 
   const searchParams = request.nextUrl.searchParams;
-  const status = searchParams.get('status') ?? undefined;
+  const status = isAuthorized ? searchParams.get('status') ?? undefined : undefined;
   const type = searchParams.get('type') ?? undefined;
 
+  const where: Prisma.ContentWhereInput = {
+    ...(type ? { type } : {}),
+  };
+
+  if (isAuthorized) {
+    if (status) {
+      where.status = status;
+    }
+  } else {
+    where.status = 'published';
+  }
+
   const content = await prisma.content.findMany({
-    where: {
-      ...(status ? { status } : {}),
-      ...(type ? { type } : {}),
-    },
+    where,
     orderBy: { updatedAt: 'desc' },
     include: {
       versions: {

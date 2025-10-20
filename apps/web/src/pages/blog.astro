@@ -1,0 +1,174 @@
+---
+import Header from '../components/astro/Header.astro';
+import Footer from '../components/astro/Footer.astro';
+import ArticleCard from '../components/astro/ArticleCard.astro';
+
+const apiBase =
+  import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+const apiUrl = `${apiBase.replace(/\/$/, '')}/api/content`;
+
+type VersionData = {
+  data?: Record<string, unknown>;
+  publishedAt?: string | null;
+};
+
+type ContentItem = {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  type: string;
+  description?: string | null;
+  updatedAt?: string;
+  publishedAt?: string | null;
+  versions?: VersionData[];
+};
+
+let articles: ContentItem[] = [];
+let loadError: string | null = null;
+
+try {
+  const response = await fetch(apiUrl, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (response.ok) {
+    const payload = await response.json();
+    articles = Array.isArray(payload.content) ? payload.content : [];
+  } else {
+    loadError = `Unable to load articles (status ${response.status}).`;
+  }
+} catch (error) {
+  loadError = 'Unable to reach the content service.';
+}
+
+const publishedArticles = articles
+  .filter((item) => (item.status ?? '').toLowerCase() === 'published')
+  .map((item) => {
+    const latestVersion = item.versions?.[0];
+    const summary =
+      item.description ??
+      (typeof latestVersion?.data?.excerpt === 'string'
+        ? (latestVersion.data.excerpt as string)
+        : undefined);
+    return {
+      id: item.id,
+      title: item.title,
+      slug: item.slug,
+      status: item.status,
+      type: item.type,
+      summary,
+      updatedAt: item.updatedAt,
+      publishedAt: item.publishedAt ?? latestVersion?.publishedAt ?? null,
+    };
+  });
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>Blog | NovaCMS</title>
+  </head>
+  <body>
+    <Header />
+
+    <main class="blog">
+      <section class="hero">
+        <h1>Insights & Stories</h1>
+        <p>
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent eget lorem
+          at tortor accumsan aliquet. Stay tuned for product updates, tutorials, and
+          customer spotlights.
+        </p>
+      </section>
+
+      {loadError ? (
+        <section class="feedback error">
+          <p>{loadError}</p>
+        </section>
+      ) : publishedArticles.length === 0 ? (
+        <section class="feedback empty">
+          <p>No published articles yet. Check back soon!</p>
+        </section>
+      ) : (
+        <section class="articles">
+          {publishedArticles.map((article) => (
+            <ArticleCard
+              title={article.title}
+              slug={article.slug}
+              status={article.status}
+              type={article.type}
+              summary={article.summary}
+              updatedAt={article.updatedAt}
+              publishedAt={article.publishedAt}
+            />
+          ))}
+        </section>
+      )}
+    </main>
+
+    <Footer />
+  </body>
+</html>
+
+<style>
+  :global(body) {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1f2937;
+    background: #f8fafc;
+  }
+
+  .blog {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .hero h1 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(2.3rem, 4vw, 3rem);
+  }
+
+  .hero p {
+    margin: 0;
+    color: #4b5563;
+    line-height: 1.7;
+    max-width: 640px;
+  }
+
+  .articles {
+    display: grid;
+    gap: 1.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .feedback {
+    background: #ffffff;
+    border-radius: 1.25rem;
+    padding: 2rem;
+    box-shadow: 0 24px 45px rgba(15, 23, 42, 0.12);
+  }
+
+  .feedback p {
+    margin: 0;
+    color: #475569;
+    line-height: 1.6;
+  }
+
+  .feedback.error {
+    border-left: 4px solid #ef4444;
+  }
+
+  .feedback.empty {
+    border-left: 4px solid #6366f1;
+  }
+</style>
