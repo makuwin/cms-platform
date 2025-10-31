@@ -1,3 +1,5 @@
+import { promises as fs } from 'fs';
+import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 
 import {
@@ -19,19 +21,29 @@ export async function POST(request: NextRequest) {
   }
 
   const mediaId = crypto.randomUUID();
-  const filename = file.name ?? `upload-${mediaId}`;
+  const rawFilename = file.name ?? `upload-${mediaId}`;
+  const safeFilename = rawFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
   const mimeType = file.type || 'application/octet-stream';
 
-  // TODO: Persist file to object storage / CDN.
+  const uploadsRoot = path.join(process.cwd(), 'public', 'media');
+  const targetDir = path.join(uploadsRoot, mediaId);
+  const targetPath = path.join(targetDir, safeFilename);
+
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(targetPath, fileBuffer);
+
+  const publicUrl = `/media/${mediaId}/${safeFilename}`;
 
   return NextResponse.json(
     {
       id: mediaId,
-      filename,
+      filename: safeFilename,
       mimeType,
       size: file.size,
       uploadedBy: user.id,
-      url: `/media/${mediaId}/${filename}`,
+      url: publicUrl,
     },
     { status: 201 },
   );

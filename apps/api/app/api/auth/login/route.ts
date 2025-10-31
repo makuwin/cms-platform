@@ -46,9 +46,17 @@ export async function POST(request: NextRequest) {
     const explicitPermissions =
       (user as { permissions?: string[] }).permissions ?? [];
 
+    const rawName = (user as { name?: string | null }).name ?? '';
+    const fallbackName =
+      typeof credentials.email === 'string' && credentials.email.includes('@')
+        ? credentials.email.split('@')[0]
+        : credentials.email;
+    const name = rawName.trim().length > 0 ? rawName : fallbackName;
+
     const authUser = {
       id: (user as { id: string }).id,
       email: credentials.email,
+      name,
       role,
       permissions: buildPermissions(role, explicitPermissions),
     };

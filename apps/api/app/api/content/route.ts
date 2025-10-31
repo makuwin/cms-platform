@@ -29,6 +29,20 @@ export async function GET(request: NextRequest) {
     where,
     orderBy: { updatedAt: 'desc' },
     include: {
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      updatedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       versions: {
         orderBy: { version: 'desc' },
         take: 1,
@@ -54,6 +68,7 @@ export async function POST(request: NextRequest) {
         slug: payload.slug,
         type: payload.type,
         status: 'draft',
+        description: payload.description ?? null,
         createdById: user.id,
         updatedById: user.id,
       },
@@ -68,12 +83,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const response = {
-      ...created,
-      versions: [version],
-    };
-
-    return NextResponse.json(response, { status: 201 });
+    return NextResponse.json({ ...created, versions: [version] }, { status: 201 });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to create content';

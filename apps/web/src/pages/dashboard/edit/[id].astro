@@ -1,0 +1,200 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import EditContentCard from "../../../components/react/EditContentCard";
+import { getCookieValue } from "../../../utils/cookies";
+
+export const prerender = false;
+
+const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:3000";
+const normalizedBase = apiBase.replace(/\/$/, "");
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect("/dashboard");
+}
+
+const cookieHeader = Astro.request.headers.get("cookie") ?? "";
+const accessToken = getCookieValue(cookieHeader, "access_token");
+
+if (!cookieHeader) {
+  return Astro.redirect("/sign-in");
+}
+
+let headerUser:
+  | {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      role?: string | null;
+    }
+  | null = null;
+
+try {
+  const meResponse = await fetch(`${normalizedBase}/api/auth/me`, {
+    headers: {
+      Accept: "application/json",
+      cookie: cookieHeader,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+
+  if (meResponse.status === 401) {
+    return Astro.redirect("/sign-in");
+  }
+
+  if (!meResponse.ok) {
+    throw new Error("Unable to determine session user");
+  }
+
+  const payload = await meResponse.json();
+  headerUser = payload?.user ?? null;
+} catch (error) {
+  console.error("Unable to determine session user", error);
+  return Astro.redirect("/sign-in");
+}
+
+if (!headerUser) {
+  return Astro.redirect("/sign-in");
+}
+
+const normalizedRole = (headerUser.role ?? "").toLowerCase();
+
+if (normalizedRole === "viewer") {
+  return Astro.redirect("/");
+}
+
+let contentItem:
+  | {
+      id: string;
+      title: string;
+      slug: string;
+      type: string;
+      description: string;
+      bodyHtml: string;
+      media: {
+        id?: string;
+        filename?: string;
+        url: string;
+        mimeType?: string;
+      }[];
+      excerpt?: string | null;
+    }
+  | null = null;
+
+try {
+  const response = await fetch(`${normalizedBase}/api/content/${id}`, {
+    headers: {
+      Accept: "application/json",
+      cookie: cookieHeader,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return Astro.redirect("/dashboard");
+  }
+
+  if (response.status === 401) {
+    return Astro.redirect("/sign-in");
+  }
+
+  if (!response.ok) {
+    throw new Error(`Unable to load content (${response.status})`);
+  }
+
+  const payload = await response.json();
+
+  const latestVersion =
+    payload?.versions && Array.isArray(payload.versions)
+      ? payload.versions[0]
+      : null;
+
+  const rawData =
+    latestVersion &&
+    latestVersion.data &&
+    typeof latestVersion.data === "object" &&
+    !Array.isArray(latestVersion.data)
+      ? latestVersion.data
+      : {};
+
+  const bodyHtml =
+    typeof rawData?.body === "string" ? String(rawData.body) : "";
+
+  const media =
+    Array.isArray(rawData?.media)
+      ? rawData.media
+          .map((value: unknown) => {
+            if (!value || typeof value !== "object" || Array.isArray(value)) {
+              return null;
+            }
+            const mediaItem = value as Record<string, unknown>;
+            const url = mediaItem.url;
+            if (typeof url !== "string" || url.trim().length === 0) {
+              return null;
+            }
+            return {
+              id: typeof mediaItem.id === "string" ? mediaItem.id : undefined,
+              filename:
+                typeof mediaItem.filename === "string" ? mediaItem.filename : undefined,
+              url,
+              mimeType:
+                typeof mediaItem.mimeType === "string" ? mediaItem.mimeType : undefined,
+            };
+          })
+          .filter(
+            (
+              value,
+            ): value is {
+              id?: string;
+              filename?: string;
+              url: string;
+              mimeType?: string;
+            } => value !== null,
+          )
+      : [];
+
+  const excerpt =
+    typeof rawData?.excerpt === "string"
+      ? String(rawData.excerpt)
+      : payload?.description ?? null;
+
+  contentItem = {
+    id: payload?.id ?? id,
+    title: payload?.title ?? "",
+    slug: payload?.slug ?? "",
+    type: payload?.type ?? "",
+    description: payload?.description ?? "",
+    bodyHtml,
+    media,
+    excerpt,
+  };
+} catch (error) {
+  console.error("Failed to load content item", error);
+  return Astro.redirect("/dashboard");
+}
+
+if (!contentItem) {
+  return Astro.redirect("/dashboard");
+}
+
+const initialUser = headerUser;
+---
+
+<BaseLayout initialUser={initialUser} title="Edit Content | NovaCMS">
+  <main class="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-12 sm:px-8 lg:gap-12 lg:py-14">
+    <EditContentCard
+      client:load
+      apiBase={apiBase}
+      contentId={contentItem.id}
+      initialTitle={contentItem.title}
+      initialSlug={contentItem.slug}
+      initialType={contentItem.type}
+      initialDescription={contentItem.description ?? ""}
+      initialBody={contentItem.bodyHtml ?? ""}
+      initialMedia={contentItem.media ?? []}
+      initialExcerpt={contentItem.excerpt ?? null}
+    />
+  </main>
+</BaseLayout>

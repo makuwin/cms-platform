@@ -1,0 +1,159 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlogSearch from '../../components/react/BlogSearch';
+import BlogList, { type BlogEntry } from '../../components/react/BlogList';
+import { getCookieValue } from '../../utils/cookies';
+import { stripHtml } from '../../utils/html';
+
+export const prerender = false;
+
+const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+const normalizedBase = apiBase.replace(/\/$/, '');
+
+const cookieHeader = Astro.request.headers.get('cookie') ?? '';
+const accessToken = getCookieValue(cookieHeader, 'access_token');
+
+let initialUser:
+  | {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      role?: string | null;
+    }
+  | null = null;
+
+if (cookieHeader) {
+  try {
+    const meResponse = await fetch(`${normalizedBase}/api/auth/me`, {
+      headers: {
+        Accept: 'application/json',
+        cookie: cookieHeader,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+    if (meResponse.ok) {
+      const payload = await meResponse.json();
+      initialUser = payload?.user ?? null;
+    }
+  } catch {
+    initialUser = null;
+  }
+}
+
+type ApiContentItem = {
+  id: string;
+  title: string;
+  slug: string;
+  type: string;
+  status: string;
+  description?: string | null;
+  createdBy?: {
+    name?: string | null;
+    email: string;
+  } | null;
+  publishedAt?: string | null;
+  versions?: Array<{
+    data?: Record<string, unknown>;
+    publishedAt?: string | null;
+  }>;
+};
+
+const mapToEntry = (item: ApiContentItem): BlogEntry | null => {
+  if ((item.status ?? '').toLowerCase() === 'archived') {
+    return null;
+  }
+
+  const latestVersion = item.versions?.[0] ?? null;
+  const data =
+    latestVersion &&
+    latestVersion.data &&
+    typeof latestVersion.data === 'object' &&
+    !Array.isArray(latestVersion.data)
+      ? latestVersion.data
+      : {};
+
+  const body =
+    typeof data?.body === 'string' ? String(data.body) : '';
+
+  if (!body.trim()) {
+    return null;
+  }
+
+  const excerpt =
+    typeof data?.excerpt === 'string'
+      ? String(data.excerpt)
+      : item.description ?? stripHtml(body).slice(0, 140);
+
+  const author =
+    item.createdBy?.name?.trim() ||
+    item.createdBy?.email?.split('@')[0] ||
+    'Unknown author';
+
+  const publishedAt =
+    item.publishedAt ??
+    latestVersion?.publishedAt ??
+    null;
+
+  return {
+    id: item.id,
+    title: item.title,
+    slug: item.slug,
+    summary: excerpt,
+    author,
+    type: item.type ?? 'article',
+    publishedAt,
+    bodyHtml: body,
+  };
+};
+
+let initialContent: BlogEntry[] = [];
+
+try {
+  const response = await fetch(`${normalizedBase}/api/content`, {
+    headers: {
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (response.ok) {
+    const payload = await response.json();
+    const content = Array.isArray(payload?.content) ? payload.content : [];
+    initialContent = content
+      .map(mapToEntry)
+      .filter((entry): entry is BlogEntry => entry !== null)
+      .sort((a, b) => {
+        const aTime = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+        const bTime = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+        return bTime - aTime;
+      });
+  }
+} catch (error) {
+  console.error('Unable to load initial blog content', error);
+  initialContent = [];
+}
+
+const initialQuery = Astro.url.searchParams.get('q') ?? '';
+---
+
+<BaseLayout initialUser={initialUser} title="Blog | NovaCMS">
+  <main class="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-12 sm:px-8">
+    <section class="flex flex-col gap-4">
+      <h1 class="text-4xl font-semibold text-slate-900 md:text-5xl">
+        Insights &amp; Stories
+      </h1>
+      <p class="max-w-2xl text-lg leading-relaxed text-slate-600">
+        Product updates, implementation guides, and stories from the NovaCMS team.
+      </p>
+    </section>
+
+    <BlogSearch client:load initialQuery={initialQuery} />
+
+    <BlogList
+      client:load
+      apiBase={apiBase}
+      initialContent={initialContent}
+      initialQuery={initialQuery}
+    />
+  </main>
+</BaseLayout>

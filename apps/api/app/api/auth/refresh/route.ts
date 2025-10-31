@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
   const authUser = {
     id: user.id,
     email: user.email,
+    name: user.name,
     role: user.role,
     permissions: buildPermissions(user.role, user.permissions ?? []),
   };

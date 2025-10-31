@@ -1,0 +1,36 @@
+---
+import Header from "../components/astro/Header.astro";
+import Footer from "../components/astro/Footer.astro";
+import "../styles/global.css";
+
+const {
+  initialUser = null,
+  title = "NovaCMS",
+  bodyClass = "",
+} = Astro.props as {
+  initialUser?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+  title?: string;
+  bodyClass?: string;
+};
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <slot name="head" />
+  </head>
+  <body class={`min-h-screen bg-slate-50 text-slate-800 ${bodyClass}`.trim()}>
+    <Header initialUser={initialUser} />
+    <slot />
+    <Footer />
+  </body>
+</html>

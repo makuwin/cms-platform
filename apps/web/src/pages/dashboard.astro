@@ -1,109 +1,234 @@
 ---
-import Header from '../components/astro/Header.astro';
-import Footer from '../components/astro/Footer.astro';
+import BaseLayout from "../layouts/BaseLayout.astro";
+import DashboardShell from "../components/react/Dashboard";
+import CreateContentCard from "../components/react/CreateContentCard";
+import ContentList from "../components/react/ContentList";
+import UserManagementTable from "../components/react/UserManagementTable";
+import { getCookieValue } from "../utils/cookies";
+
+export const prerender = false;
+
+const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:3000";
+const normalizedBase = apiBase.replace(/\/$/, "");
+
+type VersionData = {
+  data?: Record<string, unknown>;
+  publishedAt?: string | null;
+};
+
+type ContentItem = {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  type: string;
+  description?: string | null;
+  updatedAt?: string;
+  publishedAt?: string | null;
+  versions?: VersionData[];
+  createdBy?: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  updatedBy?: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+};
+
+const cookieHeader = Astro.request.headers.get("cookie") ?? "";
+const accessToken = getCookieValue(cookieHeader, 'access_token');
+
+if (!cookieHeader) {
+  return Astro.redirect('/sign-in');
+}
+
+let headerUser:
+  | {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      role?: string | null;
+    }
+  | null = null;
+
+try {
+  const meResponse = await fetch(`${normalizedBase}/api/auth/me`, {
+    headers: {
+      Accept: "application/json",
+      cookie: cookieHeader,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+
+  if (meResponse.status === 401) {
+    return Astro.redirect('/sign-in');
+  }
+
+  if (!meResponse.ok) {
+    throw new Error('Unable to determine session user');
+  }
+
+  const payload = await meResponse.json();
+  headerUser = payload?.user ?? null;
+} catch (error) {
+  console.error('Unable to determine session user', error);
+  return Astro.redirect('/sign-in');
+}
+
+if (!headerUser) {
+  return Astro.redirect('/sign-in');
+}
+
+const normalizedRole = (headerUser.role ?? '').toLowerCase();
+
+if (normalizedRole === 'viewer') {
+  return Astro.redirect('/');
+}
+
+const currentUser = {
+  name:
+    typeof headerUser.name === 'string' && headerUser.name.trim().length > 0
+      ? headerUser.name
+      : (headerUser.email ?? 'Unknown user').split('@')[0],
+  role: normalizedRole,
+};
+
+const apiUrl = `${normalizedBase}/api/content`;
+
+let content: ContentItem[] = [];
+let loadError: string | null = null;
+
+try {
+  const response = await fetch(apiUrl, {
+    headers: {
+      Accept: "application/json",
+      cookie: cookieHeader,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    cache: 'no-store',
+  });
+
+  if (response.ok) {
+    const payload = await response.json();
+    content = Array.isArray(payload.content) ? payload.content : [];
+  } else if (response.status === 403) {
+    loadError = "You do not have permission to view this page.";
+  } else if (response.status === 401) {
+    return Astro.redirect('/sign-in');
+  } else {
+    loadError = `Unable to load content (status ${response.status}).`;
+  }
+} catch (error) {
+  console.error('Unable to reach the content service', error);
+  loadError = "Unable to reach the content service.";
+}
+
+const initialContentEntries = content.map((item) => {
+  const latestVersion = item.versions?.[0] ?? null;
+  const rawData =
+    latestVersion &&
+    latestVersion.data &&
+    typeof latestVersion.data === "object" &&
+    !Array.isArray(latestVersion.data)
+      ? (latestVersion.data as Record<string, unknown>)
+      : {};
+
+  const summary =
+    item.description ??
+    (rawData && typeof rawData.excerpt === "string"
+      ? String(rawData.excerpt)
+      : undefined);
+
+  const publishedAt = item.publishedAt ?? latestVersion?.publishedAt ?? null;
+
+  const bodyHtml =
+    typeof rawData?.body === "string" ? String(rawData.body) : "";
+
+  const media =
+    Array.isArray(rawData?.media)
+      ? rawData.media
+          .filter(
+            (value): value is Record<string, unknown> =>
+              !!value && typeof value === "object" && !Array.isArray(value),
+          )
+          .map((value) => {
+            const url = value?.url;
+            if (typeof url !== "string" || url.trim().length === 0) {
+              return null;
+            }
+            return {
+              id: typeof value.id === "string" ? value.id : undefined,
+              filename:
+                typeof value.filename === "string" ? value.filename : undefined,
+              url,
+              mimeType:
+                typeof value.mimeType === "string" ? value.mimeType : undefined,
+            };
+          })
+          .filter(
+            (value): value is {
+              id?: string;
+              filename?: string;
+              url: string;
+              mimeType?: string;
+            } => value !== null,
+          )
+      : [];
+
+  const excerpt =
+    typeof rawData?.excerpt === "string"
+      ? String(rawData.excerpt)
+      : summary ?? null;
+
+  const authorName =
+    item.createdBy?.name?.trim() || item.createdBy?.email?.split("@")[0] || "Unknown author";
+  const editorName =
+    item.updatedBy?.name?.trim() || item.updatedBy?.email?.split("@")[0] || null;
+
+  return {
+    id: item.id,
+    title: item.title,
+    slug: item.slug,
+    status: item.status,
+    type: item.type,
+    description: item.description ?? "",
+    summary,
+    updatedAt: item.updatedAt ?? null,
+    publishedAt,
+    bodyHtml,
+    media,
+    excerpt,
+    authorName,
+    editorName,
+  };
+});
+
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width" />
-    <meta name="generator" content={Astro.generator} />
-    <title>Dashboard | NovaCMS</title>
-  </head>
-  <body>
-    <Header />
+<BaseLayout initialUser={headerUser} title="Dashboard | NovaCMS">
+  <main class="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-12 sm:px-8 lg:gap-12 lg:py-14">
+    <DashboardShell
+      client:load
+      userName={currentUser.name}
+      role={currentUser.role}
+      loadError={loadError}
+    />
 
-    <main class="dashboard">
-      <section class="welcome">
-        <h1>Dashboard</h1>
-        <p>
-          You’re signed in. This space will soon show content performance, editorial
-          activity, and workspace insights.
-        </p>
-      </section>
-
-      <section class="placeholder">
-        <div class="card">
-          <h2>Coming Soon</h2>
-          <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur non
-            commodo sapien, ac tristique purus. Suspendisse potenti.
-          </p>
-        </div>
-        <div class="card">
-          <h2>Recent Activity</h2>
-          <p>
-            Nullam eu eros ligula. Phasellus consequat, sem a placerat volutpat, sapien
-            sapien dapibus justo, vitae cursus nulla mi ac nisl.
-          </p>
-        </div>
-        <div class="card">
-          <h2>Next Steps</h2>
-          <p>
-            Quisque eget ante eu augue laoreet ultricies sed at lectus. In sagittis
-            consequat purus sit amet facilisis.
-          </p>
-        </div>
-      </section>
-    </main>
-
-    <Footer />
-  </body>
-</html>
-
-<style>
-  :global(body) {
-    margin: 0;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    color: #1f2937;
-    background: #f8fafc;
-  }
-
-  .dashboard {
-    max-width: 980px;
-    margin: 0 auto;
-    padding: 3rem 1.5rem 4rem;
-    display: flex;
-    flex-direction: column;
-    gap: 2.5rem;
-  }
-
-  .welcome h1 {
-    margin: 0 0 0.75rem;
-    font-size: clamp(2.2rem, 4vw, 3rem);
-  }
-
-  .welcome p {
-    margin: 0;
-    color: #4b5563;
-    line-height: 1.7;
-  }
-
-  .placeholder {
-    display: grid;
-    gap: 1.75rem;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  }
-
-  .card {
-    background: #ffffff;
-    border-radius: 1.25rem;
-    padding: 1.75rem;
-    box-shadow: 0 24px 45px rgba(15, 23, 42, 0.12);
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .card h2 {
-    margin: 0;
-    font-size: 1.35rem;
-  }
-
-  .card p {
-    margin: 0;
-    color: #475569;
-    line-height: 1.6;
-  }
-</style>
+    {!loadError && (
+      <>
+        <CreateContentCard client:load apiBase={apiBase} />
+        <ContentList
+          client:load
+          apiBase={apiBase}
+          initialContent={initialContentEntries}
+        />
+        {normalizedRole === "admin" && (
+          <UserManagementTable client:load apiBase={apiBase} role={normalizedRole} />
+        )}
+      </>
+    )}
+  </main>
+</BaseLayout>

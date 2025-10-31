@@ -7,6 +7,7 @@ export type Role = 'admin' | 'editor' | 'author' | 'viewer';
 export type AuthUser = {
   id: string;
   email: string;
+  name: string;
   role: Role;
   permissions: string[];
 };

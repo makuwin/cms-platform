@@ -1,0 +1,184 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCookieValue } from '../../utils/cookies';
+import { stripHtml } from '../../utils/html';
+
+export const prerender = false;
+
+const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+const normalizedBase = apiBase.replace(/\/$/, '');
+
+const slugParam = Astro.params.slug;
+const slugSegments = Array.isArray(slugParam) ? slugParam : [slugParam];
+const targetSlug = slugSegments.filter(Boolean).join('/');
+
+if (!targetSlug) {
+  return Astro.redirect('/blog');
+}
+
+const cookieHeader = Astro.request.headers.get('cookie') ?? '';
+const accessToken = getCookieValue(cookieHeader, 'access_token');
+
+let initialUser:
+  | {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      role?: string | null;
+    }
+  | null = null;
+
+if (cookieHeader) {
+  try {
+    const meResponse = await fetch(`${normalizedBase}/api/auth/me`, {
+      headers: {
+        Accept: 'application/json',
+        cookie: cookieHeader,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+    if (meResponse.ok) {
+      const payload = await meResponse.json();
+      initialUser = payload?.user ?? null;
+    }
+  } catch {
+    initialUser = null;
+  }
+}
+
+type ApiContentItem = {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  description?: string | null;
+  createdBy?: {
+    name?: string | null;
+    email: string;
+  } | null;
+  publishedAt?: string | null;
+  versions?: Array<{
+    data?: Record<string, unknown>;
+    publishedAt?: string | null;
+  }>;
+};
+
+let contentItem:
+  | {
+      id: string;
+      title: string;
+      bodyHtml: string;
+      summary: string;
+      author: string;
+      publishedAt: string | null;
+    }
+  | null = null;
+
+try {
+  const response = await fetch(`${normalizedBase}/api/content`, {
+    headers: {
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (response.ok) {
+    const payload = await response.json();
+    const items: ApiContentItem[] = Array.isArray(payload?.content)
+      ? payload.content
+      : [];
+
+    const target = items.find(
+      (item) => item.slug?.toLowerCase() === targetSlug.toLowerCase(),
+    );
+
+    if (target && (target.status ?? '').toLowerCase() === 'published') {
+      const latestVersion = target.versions?.[0] ?? null;
+      const data =
+        latestVersion &&
+        latestVersion.data &&
+        typeof latestVersion.data === 'object' &&
+        !Array.isArray(latestVersion.data)
+          ? latestVersion.data
+          : {};
+
+      const body =
+        typeof data?.body === 'string' ? String(data.body) : '';
+
+      if (body.trim().length > 0) {
+        const excerpt =
+          typeof data?.excerpt === 'string'
+            ? String(data.excerpt)
+            : target.description ??
+              stripHtml(body).slice(0, 160);
+
+        const author =
+          target.createdBy?.name?.trim() ||
+          target.createdBy?.email?.split('@')[0] ||
+          'Unknown author';
+
+        const publishedAt =
+          target.publishedAt ??
+          latestVersion?.publishedAt ??
+          null;
+
+        contentItem = {
+          id: target.id,
+          title: target.title,
+          bodyHtml: body,
+          summary: excerpt,
+          author,
+          publishedAt,
+        };
+      }
+    }
+  }
+} catch (error) {
+  console.error('Unable to load article', error);
+}
+
+if (!contentItem) {
+  return Astro.redirect('/blog');
+}
+
+const publishedDisplay = contentItem.publishedAt
+  ? new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(new Date(contentItem.publishedAt))
+  : null;
+---
+
+<BaseLayout initialUser={initialUser} title={`${contentItem.title} | NovaCMS`}>
+  <main class="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-12 sm:px-8 lg:gap-12 lg:py-14">
+    <article class="flex flex-col gap-6">
+      <header class="space-y-4">
+        <p class="text-sm font-semibold uppercase tracking-wide text-indigo-500">
+          NovaCMS Blog
+        </p>
+        <h1 class="text-4xl font-semibold text-slate-900 md:text-5xl">
+          {contentItem.title}
+        </h1>
+        <div class="flex flex-wrap gap-3 text-sm text-slate-500">
+          <span>By {contentItem.author}</span>
+          {publishedDisplay && <span>{publishedDisplay}</span>}
+        </div>
+      </header>
+
+      <section
+        class="prose prose-slate max-w-none prose-headings:text-slate-900 prose-a:text-indigo-600 prose-img:rounded-2xl"
+        set:html={contentItem.bodyHtml}
+      />
+    </article>
+
+    <div class="flex justify-start">
+      <a
+        href="/blog"
+        class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+      >
+        ← Back to Blog
+      </a>
+    </div>
+  </main>
+</BaseLayout>

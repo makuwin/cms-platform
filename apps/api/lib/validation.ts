@@ -58,8 +58,7 @@ export const validateLogin: Validator<LoginInput> = (body) => {
 export type RegisterInput = {
   email: string;
   password: string;
-  role?: string;
-  name?: string;
+  name: string;
 };
 
 export const validateRegister: Validator<RegisterInput> = (body) => {
@@ -70,8 +69,7 @@ export const validateRegister: Validator<RegisterInput> = (body) => {
   return {
     email: assertEmail(data.email),
     password: assertString(data.password, 'Password'),
-    role: assertOptionalString(data.role, 'Role'),
-    name: assertOptionalString(data.name, 'Name'),
+    name: assertString(data.name, 'Name'),
   };
 };
 
@@ -80,6 +78,7 @@ export type ContentInput = {
   slug: string;
   type: string;
   data: Record<string, unknown>;
+  description?: string;
 };
 
 export const validateContent: Validator<ContentInput> = (body) => {
@@ -92,6 +91,7 @@ export const validateContent: Validator<ContentInput> = (body) => {
     slug: assertString(data.slug, 'Slug'),
     type: assertString(data.type, 'Type'),
     data: assertJson(data.data, 'Data'),
+    description: assertOptionalString(data.description, 'Description'),
   };
 };
 

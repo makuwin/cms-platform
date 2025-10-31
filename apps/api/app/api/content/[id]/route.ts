@@ -17,6 +17,20 @@ export async function GET(
   const content = await prisma.content.findUnique({
     where: { id: params.id },
     include: {
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      updatedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       versions: {
         orderBy: { version: 'desc' },
       },
@@ -68,7 +82,24 @@ export async function PUT(
         title: payload.title,
         slug: payload.slug,
         type: payload.type,
+        description: payload.description ?? null,
         updatedById: user.id,
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        updatedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 

@@ -1,15 +1,10 @@
+import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 
-import {
-  Role,
-  buildPermissions,
-  hashPassword,
-  signTokens,
-} from '@/lib/auth';
+import { Role, buildPermissions, hashPassword, signTokens } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { validateRegister } from '@/lib/validation';
-
-const ALLOWED_ROLES: Role[] = ['admin', 'editor', 'author', 'viewer'];
+import { DEFAULT_ROLE, PRIMARY_ADMIN_ROLE } from '@/lib/roles';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,27 +22,70 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const role = (ALLOWED_ROLES.includes(payload.role as Role)
-      ? payload.role
-      : 'viewer') as Role;
     const passwordHash = await hashPassword(payload.password);
-    const explicitPermissions = buildPermissions(role).filter(
-      (perm) => !perm.includes('*'),
-    );
+    const adminLockValue = 'PRIMARY';
 
-    const user = await prisma.user.create({
-      data: {
-        email: payload.email,
-        name: payload.name ?? payload.email.split('@')[0],
-        role,
-        passwordHash,
-        permissions: explicitPermissions,
-      },
+    const { user, role } = await prisma.$transaction(async (tx) => {
+      const shouldPromote = (await tx.user.count()) === 0;
+
+      const isPrimaryAdminLockViolation = (error: unknown) => {
+        if (
+          !(
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002'
+          )
+        ) {
+          return false;
+        }
+
+        const target = error.meta?.target;
+        if (Array.isArray(target)) {
+          return target.includes('primaryAdminLock');
+        }
+
+        return target === 'primaryAdminLock';
+      };
+
+      const createUser = async (
+        assignedRole: Role,
+        withPrimaryAdminLock: boolean,
+      ) => {
+        const explicitPermissions = buildPermissions(assignedRole).filter(
+          (perm) => !perm.includes('*'),
+        );
+
+        const data = {
+          email: payload.email,
+          name: payload.name,
+          role: assignedRole,
+          passwordHash,
+          permissions: explicitPermissions,
+          ...(withPrimaryAdminLock ? { primaryAdminLock: adminLockValue } : {}),
+        };
+
+        const created = await tx.user.create({ data });
+        return { user: created, role: assignedRole };
+      };
+
+      if (!shouldPromote) {
+        return createUser(DEFAULT_ROLE, false);
+      }
+
+      try {
+        return await createUser(PRIMARY_ADMIN_ROLE, true);
+      } catch (error) {
+        if (isPrimaryAdminLockViolation(error)) {
+          return createUser(DEFAULT_ROLE, false);
+        }
+
+        throw error;
+      }
     });
 
     const authUser = {
       id: user.id,
       email: user.email,
+      name: user.name,
       role,
       permissions: buildPermissions(role, user.permissions ?? []),
     };
